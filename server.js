@@ -59,6 +59,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const COOKIE_FILE = process.env.COOKIE_FILE || path.join(__dirname, '.cookie');
 const QQ_COOKIE_FILE = process.env.QQ_COOKIE_FILE || path.join(__dirname, '.qq-cookie');
+const KUGOU_COOKIE_FILE = process.env.KUGOU_COOKIE_FILE || path.join(__dirname, '.kugou-cookie');
 const UPDATE_WORK_DIR = process.env.MINERADIO_UPDATE_DIR || path.join(__dirname, 'updates');
 const UPDATE_DOWNLOAD_DIR = process.env.MINERADIO_UPDATE_DOWNLOAD_DIR || path.join(UPDATE_WORK_DIR, 'downloads');
 const UPDATE_PATCH_BACKUP_DIR = process.env.MINERADIO_PATCH_BACKUP_DIR || path.join(UPDATE_WORK_DIR, 'backups', 'patches');
@@ -184,6 +185,14 @@ catch (e) { qqCookie = ''; }
 function saveQQCookie(c) {
   qqCookie = normalizeCookieHeader(c) || rawCookieFallback(c);
   try { fs.writeFileSync(QQ_COOKIE_FILE, qqCookie); } catch (e) {}
+}
+
+let kugouCookie = '';
+try { if (fs.existsSync(KUGOU_COOKIE_FILE)) kugouCookie = fs.readFileSync(KUGOU_COOKIE_FILE, 'utf8').trim(); }
+catch (e) { kugouCookie = ''; }
+function saveKugouCookie(c) {
+  kugouCookie = normalizeCookieHeader(c) || rawCookieFallback(c);
+  try { fs.writeFileSync(KUGOU_COOKIE_FILE, kugouCookie); } catch (e) {}
 }
 
 // ---------- 工具 ----------
@@ -1478,6 +1487,52 @@ function normalizeQQCookieInput(cookieText) {
   if (obj.uin) obj.uin = normalizeQQUin(obj.uin);
   return serializeCookieObject(obj);
 }
+
+function kugouCookieObject() {
+  return parseCookieString(kugouCookie);
+}
+
+function kugouCookieUserId(obj) {
+  obj = obj || kugouCookieObject();
+  return String(obj.userid || obj.KugooID || obj.kugou_id || '').replace(/\D/g, '');
+}
+
+function kugouCookieToken(obj) {
+  obj = obj || kugouCookieObject();
+  return obj.token || obj.KuGoo || obj.t || obj.kg_mid || '';
+}
+
+function kugouCookieNickname(obj) {
+  obj = obj || kugouCookieObject();
+  try {
+    return decodeURIComponent(obj.nickname || obj.nick || obj.username || obj.user_name || '').trim();
+  } catch (_) {
+    return obj.nickname || obj.nick || obj.username || obj.user_name || '';
+  }
+}
+
+function normalizeKugouCookieInput(cookieText) {
+  return normalizeCookieHeader(cookieText) || rawCookieFallback(cookieText);
+}
+
+function getKugouLoginInfo() {
+  const obj = kugouCookieObject();
+  const userId = kugouCookieUserId(obj);
+  const token = kugouCookieToken(obj);
+  const loggedIn = !!(token || userId);
+  return {
+    provider: 'kugou',
+    loggedIn,
+    hasCookie: !!kugouCookie,
+    userId,
+    nickname: loggedIn ? (kugouCookieNickname(obj) || '酷狗音乐用户') : '酷狗音乐',
+    avatar: '',
+    playbackKeyReady: false,
+    preview: true,
+    message: loggedIn ? '已保存酷狗网页登录会话' : '未登录酷狗音乐'
+  };
+}
+
 function playbackRestriction(provider, category, message, action, extra) {
   return {
     provider,
@@ -3499,6 +3554,41 @@ const server = http.createServer(async (req, res) => {
   if (pn === '/api/qq/logout') {
     saveQQCookie('');
     sendJSON(res, { provider: 'qq', ok: true, loggedIn: false });
+    return;
+  }
+
+  if (pn === '/api/kugou/login/status') {
+    try {
+      sendJSON(res, getKugouLoginInfo());
+    } catch (err) {
+      console.error('[KugouLoginStatus]', err);
+      sendJSON(res, { provider: 'kugou', loggedIn: false, error: err.message }, 500);
+    }
+    return;
+  }
+
+  if (pn === '/api/kugou/login/cookie') {
+    try {
+      const body = await readRequestBody(req);
+      const raw = body.cookie || body.data || body.text || '';
+      const normalized = normalizeKugouCookieInput(raw);
+      if (!normalized) {
+        sendJSON(res, { provider: 'kugou', loggedIn: false, error: 'INVALID_KUGOU_COOKIE', message: '酷狗 cookie 为空' }, 400);
+        return;
+      }
+      saveKugouCookie(normalized);
+      const info = getKugouLoginInfo();
+      sendJSON(res, { ...info, saved: true });
+    } catch (err) {
+      console.error('[KugouLoginCookie]', err);
+      sendJSON(res, { provider: 'kugou', loggedIn: false, error: err.message }, 500);
+    }
+    return;
+  }
+
+  if (pn === '/api/kugou/logout') {
+    saveKugouCookie('');
+    sendJSON(res, { provider: 'kugou', ok: true, loggedIn: false });
     return;
   }
 
