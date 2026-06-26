@@ -23762,6 +23762,13 @@ async function openKugouWebLogin() {
   updateLoginProviderUi();
   if (statusEl) { statusEl.textContent = '已打开酷狗音乐窗口，请在官方页面完成登录…'; statusEl.className = 'preview'; }
   try {
+    try { await apiJson('/api/kugou/logout'); } catch (_) {}
+    try {
+      if (typeof api.clearKugouMusicLogin === 'function') await api.clearKugouMusicLogin();
+    } catch (_) {}
+    kugouLoginStatus = normalizeKugouLoginStatus(null);
+    kugouPlaylists = [];
+    renderUserBtn();
     var result = await api.openKugouMusicLogin();
     if (!result || !result.ok || !result.cookie) {
       throw new Error((result && (result.message || result.error)) || '酷狗登录未完成');
@@ -23777,6 +23784,7 @@ async function openKugouWebLogin() {
     activeAccountProvider = 'kugou';
     qqManualCookieOpen = false;
     renderUserBtn();
+    refreshUserPlaylists(true);
     if (statusEl) { statusEl.textContent = '酷狗音乐会话已保存'; statusEl.className = 'scan'; }
     setTimeout(function(){
       closeLoginModal();

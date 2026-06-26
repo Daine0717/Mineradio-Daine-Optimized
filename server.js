@@ -1499,7 +1499,7 @@ function kugouCookieUserId(obj) {
 
 function kugouCookieToken(obj) {
   obj = obj || kugouCookieObject();
-  return obj.token || obj.KuGoo || obj.t || obj.kg_mid || '';
+  return obj.token || obj.KuGoo || obj.t || '';
 }
 
 function kugouCookieNickname(obj) {
@@ -1519,7 +1519,7 @@ function getKugouLoginInfo() {
   const obj = kugouCookieObject();
   const userId = kugouCookieUserId(obj);
   const token = kugouCookieToken(obj);
-  const loggedIn = !!(token || userId);
+  const loggedIn = !!(userId && token);
   return {
     provider: 'kugou',
     loggedIn,
@@ -3810,6 +3810,16 @@ const server = http.createServer(async (req, res) => {
       }
       saveKugouCookie(normalized);
       const info = getKugouLoginInfo();
+      if (!info.loggedIn) {
+        saveKugouCookie('');
+        sendJSON(res, {
+          provider: 'kugou',
+          loggedIn: false,
+          error: 'KUGOU_LOGIN_REQUIRED',
+          message: '酷狗登录未完成，请扫码或输入账号后再同步',
+        }, 400);
+        return;
+      }
       sendJSON(res, { ...info, saved: true });
     } catch (err) {
       console.error('[KugouLoginCookie]', err);

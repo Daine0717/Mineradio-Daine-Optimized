@@ -362,13 +362,9 @@ function neteaseCookieHasLogin(cookieText) {
 
 function kugouCookieHasLogin(cookieText) {
   const obj = parseCookieHeader(cookieText);
-  return !!(
-    obj.KuGoo ||
-    obj.KugooID ||
-    obj.userid ||
-    obj.token ||
-    (obj.kg_mid && String(cookieText || '').length > 30)
-  );
+  const userId = String(obj.userid || obj.KugooID || obj.kugou_id || '').replace(/\D/g, '');
+  const authToken = obj.token || obj.KuGoo || obj.t || '';
+  return !!(userId && authToken);
 }
 
 function isQQCookieDomain(domain) {
@@ -635,8 +631,7 @@ async function openQQMusicLoginWindow(owner) {
 
 async function openKugouMusicLoginWindow(owner) {
   const cookieSession = session.fromPartition(KUGOU_LOGIN_PARTITION);
-  const initialCookie = await readKugouLoginCookieHeader(cookieSession);
-  if (kugouCookieHasLogin(initialCookie)) return { ok: true, cookie: initialCookie, reused: true };
+  await clearKugouMusicLoginSession();
 
   return new Promise((resolve) => {
     let settled = false;
