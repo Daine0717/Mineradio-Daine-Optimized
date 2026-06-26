@@ -23648,55 +23648,46 @@ function stopQrPoll() { if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTim
 var baseUpdateLoginProviderUi = updateLoginProviderUi;
 updateLoginProviderUi = function() {
   baseUpdateLoginProviderUi();
-  if (loginProvider !== 'kugou') return;
-  var desc = document.getElementById('login-desc');
+  var shell = document.getElementById('qr-shell');
+  var img = document.getElementById('qr-img');
+  var qqCard = document.getElementById('qq-web-login-card');
+  if (loginProvider !== 'kugou') {
+    if (qqCard) qqCard.style.display = '';
+    if (img) img.style.display = '';
+    return;
+  }
+  var desc = document.getElementById('login-modal-desc');
   var st = document.getElementById('qr-status');
   var refreshBtn = document.getElementById('refresh-qr-btn');
-  var qqCard = document.getElementById('qq-web-login-card');
-  if (desc) desc.innerHTML = 'Use <b>Kugou Music App</b> to scan this QR code. After confirmation, your Kugou playlists will be synced into Mineradio.';
+  if (shell) {
+    shell.classList.add('web-login-preview');
+    shell.classList.remove('netease-preview', 'qq-preview');
+  }
+  if (img) img.style.display = 'none';
+  if (qqCard) qqCard.style.display = 'flex';
+  if (desc) desc.innerHTML = 'Open the <b>Kugou official web login window</b>. After you finish login, Mineradio will read the session and sync your Kugou playlists.';
   if (st && !qrKey) {
-    st.textContent = kugouLoginStatus.loggedIn ? ('Kugou logged in · ' + (kugouLoginStatus.nickname || kugouLoginStatus.userId || '')) : 'Click refresh to get a Kugou QR code';
+    st.textContent = kugouLoginStatus.loggedIn ? ('Kugou logged in · ' + (kugouLoginStatus.nickname || kugouLoginStatus.userId || '')) : 'Click web login and finish login in the Kugou window';
     st.className = 'preview';
   }
   if (refreshBtn) {
-    refreshBtn.disabled = false;
-    refreshBtn.textContent = 'Kugou QR Login';
-    refreshBtn.onclick = refreshQr;
+    refreshBtn.disabled = !!kugouWebLoginBusy;
+    refreshBtn.textContent = kugouWebLoginBusy ? 'Waiting...' : 'Kugou Web Login';
+    refreshBtn.onclick = openKugouWebLogin;
   }
   if (qqCard) {
-    qqCard.disabled = false;
+    qqCard.disabled = !!kugouWebLoginBusy;
     var cardMark = qqCard.querySelector('b');
     var cardLabel = qqCard.querySelector('span');
     if (cardMark) cardMark.textContent = 'KG';
-    if (cardLabel) cardLabel.textContent = 'Scan QR and sync playlists';
-    qqCard.onclick = refreshQr;
+    if (cardLabel) cardLabel.textContent = kugouWebLoginBusy ? 'Waiting for login' : 'Open official web login';
+    qqCard.onclick = openKugouWebLogin;
   }
 };
 var baseRefreshQr = refreshQr;
 refreshQr = async function() {
   if (loginProvider !== 'kugou') return baseRefreshQr();
-  stopQrPoll();
-  qrKey = null;
-  updateLoginProviderUi();
-  var kgStatus = document.getElementById('qr-status');
-  var kgImg = document.getElementById('qr-img');
-  if (kgImg) kgImg.src = '';
-  try {
-    var kgQr = await apiJson('/api/kugou/login/qr/key?t=' + Date.now());
-    if (!kgQr || !kgQr.key || !kgQr.img) throw new Error((kgQr && kgQr.error) || 'Kugou QR failed');
-    qrKey = kgQr.key;
-    if (kgImg) kgImg.src = kgQr.img;
-    if (kgStatus) {
-      kgStatus.textContent = 'Use Kugou Music App to scan, then confirm login';
-      kgStatus.className = '';
-    }
-    startQrPoll();
-  } catch (e) {
-    if (kgStatus) {
-      kgStatus.textContent = 'Kugou QR error: ' + (e && e.message ? e.message : 'unknown');
-      kgStatus.className = 'fail';
-    }
-  }
+  return openKugouWebLogin();
 };
 function toggleQQCookiePanel() {
   qqManualCookieOpen = !qqManualCookieOpen;
