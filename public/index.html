@@ -23814,15 +23814,23 @@ async function openKugouWebLogin() {
     kugouPlaylists = [];
     renderUserBtn();
     var result = await api.openKugouMusicLogin();
-    if (!result || !result.ok || !result.cookie) {
+    if (!result || !result.ok) {
       throw new Error((result && (result.message || result.error)) || '酷狗登录未完成');
     }
     if (statusEl) { statusEl.textContent = '正在同步酷狗音乐会话…'; statusEl.className = 'preview'; }
-    var info = await apiJson('/api/kugou/login/cookie', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookie: result.cookie })
-    });
+    var info = result.loggedIn
+      ? result
+      : await apiJson('/api/kugou/login/cookie', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookie: result.cookie || '' })
+        });
+    if (info && info.loggedIn && !info.saved) {
+      try {
+        var freshInfo = await apiJson('/api/kugou/login/status?t=' + Date.now());
+        if (freshInfo && freshInfo.loggedIn) info = freshInfo;
+      } catch (_) {}
+    }
     if (!info || !info.loggedIn) throw new Error((info && (info.message || info.error)) || '酷狗会话不可用');
     kugouLoginStatus = normalizeKugouLoginStatus(info);
     activeAccountProvider = 'kugou';

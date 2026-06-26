@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog } = require('electron');
 const net = require('net');
+const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { execFile, spawn } = require('child_process');
@@ -678,6 +679,58 @@ async function openKugouMusicLoginWindow(owner) {
       }
     };
 
+    const localJson = (pathname) => new Promise((ok, fail) => {
+      const port = mainServerPort || Number(process.env.PORT) || 3000;
+      const req = http.get(`http://127.0.0.1:${port}${pathname}`, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            if (res.statusCode >= 400) {
+              const err = new Error(data.message || data.error || `HTTP_${res.statusCode}`);
+              err.data = data;
+              fail(err);
+              return;
+            }
+            ok(data);
+          } catch (e) {
+            fail(e);
+          }
+        });
+      });
+      req.setTimeout(12000, () => req.destroy(new Error('Kugou login request timeout')));
+      req.on('error', fail);
+    });
+
+    const startKugouQrLogin = async () => {
+      try {
+        const qr = await localJson('/api/kugou/login/qr/key?t=' + Date.now());
+        const key = qr && (qr.key || qr.qrcode);
+        if (!key || !qr.url) throw new Error('Kugou QR login URL missing');
+        await loginWindow.loadURL(qr.url);
+        const pollLogin = async () => {
+          try {
+            const data = await localJson('/api/kugou/login/qr/check?key=' + encodeURIComponent(key) + '&t=' + Date.now());
+            if (data && data.code === 803 && data.loggedIn) {
+              finish(Object.assign({ ok: true }, data));
+            } else if (data && data.code === 800) {
+              finish({ ok: false, error: data.message || 'Kugou QR expired, please try again' });
+            }
+          } catch (e) {
+            console.warn('Kugou QR login check failed:', e.message);
+          }
+        };
+        pollTimer = setInterval(pollLogin, 1200);
+        pollLogin();
+      } catch (e) {
+        console.warn('Kugou QR login failed, falling back to web home:', e.message);
+        pollTimer = setInterval(checkCookies, 1200);
+        loginWindow.loadURL(KUGOU_LOGIN_URL).catch((err) => finish({ ok: false, error: err.message }));
+      }
+    };
+
     loginWindow.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\/([^/]+\.)?kugou\.com/i.test(url) || /^https?:\/\/([^/]+\.)?kgimg\.com/i.test(url)) {
         loginWindow.loadURL(url).catch((e) => console.warn('Kugou login popup navigation failed:', e.message));
@@ -717,8 +770,7 @@ async function openKugouMusicLoginWindow(owner) {
       }
     });
 
-    pollTimer = setInterval(checkCookies, 1200);
-    loginWindow.loadURL(KUGOU_LOGIN_URL).catch((e) => finish({ ok: false, error: e.message }));
+    startKugouQrLogin();
   });
 }
 
