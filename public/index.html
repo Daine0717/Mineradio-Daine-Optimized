@@ -10329,7 +10329,8 @@ async function fetchBeatPrefetchAudioUrl(song) {
   var provider = songProviderKey(song);
   var isQQ = provider === 'qq';
   if (provider === 'kugou') {
-    var kg = await apiJson('/api/kugou/song/url?hash=' + encodeURIComponent(song.hash || song.id || '') + '&albumAudioId=' + encodeURIComponent(song.albumAudioId || song.album_audio_id || ''));
+    var kgQuality = normalizePlaybackQuality(playbackQuality);
+    var kg = await apiJson('/api/kugou/song/url?hash=' + encodeURIComponent(song.hash || song.id || '') + '&albumAudioId=' + encodeURIComponent(song.albumAudioId || song.album_audio_id || '') + '&albumId=' + encodeURIComponent(song.albumId || song.album_id || '') + '&quality=' + encodeURIComponent(kgQuality) + kugouQualityHashesParam(song));
     if (!kg || !kg.url) return null;
     return '/api/audio?url=' + encodeURIComponent(kg.url);
   }
@@ -13044,10 +13045,10 @@ function makeShelfManager() {
     if (hasAnyPlatformLogin() && (userPlaylists.length || myPodcastCollections.length)) {
       var source = activePlaylists();
       var items = source.map(function(pl){
-        var provider = pl.provider === 'qq' ? 'qq' : 'netease';
-        var sourceLabel = provider === 'qq' ? 'QQ' : 'NE';
+        var provider = pl.provider === 'qq' ? 'qq' : (pl.provider === 'kugou' ? 'kugou' : 'netease');
+        var sourceLabel = provider === 'qq' ? 'QQ' : (provider === 'kugou' ? 'KG' : 'NE');
         return { type:'playlist', title: pl.name, sub:sourceLabel + ' · ' + (pl.trackCount||0)+' 首 · 播放 '+compactCount(pl.playCount||0),
-          cover: pl.cover || '', tag: pl.subscribed ? '收藏歌单' : '我的歌单', playlistId: (provider === 'qq' ? 'qq:' : '') + pl.id, provider: provider };
+          cover: pl.cover || '', tag: pl.subscribed ? '收藏歌单' : '我的歌单', playlistId: (provider === 'qq' ? 'qq:' : (provider === 'kugou' ? 'kugou:' : '')) + pl.id, provider: provider };
       });
       if (shelfShowsPodcasts() && (shelfPane === 'mine' || shelfMergesCollections()) && myPodcastCollections.length) {
         myPodcastCollections.forEach(function(pc){
@@ -13863,6 +13864,9 @@ void main(){ vec4 t = texture2D(uDotTex, gl_PointCoord); if (t.a < 0.02) discard
     },
     hasOpenContent: function() { return contentList && contentList.isOpen(); },
     getContentList: function() { return contentList; },
+    syncOpenContentToCurrent: function(immediate) {
+      return !!(contentList && contentList.isOpen && contentList.isOpen() && contentList.syncToCurrentPlayback && contentList.syncToCurrentPlayback(!!immediate));
+    },
     getOpenContentIndex: function() { return openCardIdx; },
     canInteract: function() { return mode !== 'off' && allItems.length > 0; }
   };
@@ -14370,6 +14374,44 @@ function makeContentListManager() {
     rowDrawAt = nowT;
   }
 
+  function contentSongKey(song) {
+    if (!song) return '';
+    if (typeof queueItemKey === 'function') return queueItemKey(song);
+    var provider = songProviderKey(song);
+    return provider + ':' + (song.hash || song.mid || song.songmid || song.id || (song.name + '|' + song.artist));
+  }
+
+  function findCurrentPlaybackTrackIndex() {
+    if (!allTracks.length || currentIdx < 0 || !playQueue || !playQueue[currentIdx]) return -1;
+    var currentSong = playQueue[currentIdx];
+    var currentKey = contentSongKey(currentSong);
+    for (var i = 0; i < allTracks.length; i++) {
+      if (contentSongKey(allTracks[i]) === currentKey) return i;
+    }
+    var provider = songProviderKey(currentSong);
+    var hash = String(currentSong.hash || '').toLowerCase();
+    var mid = String(currentSong.mid || currentSong.songmid || '').toLowerCase();
+    var id = String(currentSong.id || '').toLowerCase();
+    for (var j = 0; j < allTracks.length; j++) {
+      var item = allTracks[j] || {};
+      if (provider !== songProviderKey(item)) continue;
+      if (hash && String(item.hash || '').toLowerCase() === hash) return j;
+      if (mid && String(item.mid || item.songmid || '').toLowerCase() === mid) return j;
+      if (id && String(item.id || '').toLowerCase() === id) return j;
+    }
+    return -1;
+  }
+
+  function syncToCurrentPlayback(immediate) {
+    var idx = findCurrentPlaybackTrackIndex();
+    if (idx < 0) return false;
+    centerTarget = Math.max(0, Math.min(allTracks.length - 1, idx));
+    if (immediate) centerSmooth = centerTarget;
+    rowsDirty = true;
+    syncRenderedRows(true);
+    return true;
+  }
+
   return {
     isOpen: function() { return open; },
     refreshTheme: function() {
@@ -14434,6 +14476,7 @@ function makeContentListManager() {
       }
       var podcastCollectionKey = String(playlistId || '').indexOf('podcast:') === 0 ? String(playlistId).slice(8) : '';
       var qqPlaylistId = String(playlistId || '').indexOf('qq:') === 0 ? String(playlistId).slice(3) : '';
+      var kugouPlaylistId = String(playlistId || '').indexOf('kugou:') === 0 ? String(playlistId).slice(6) : '';
       contentKind = podcastCollectionKey ? 'podcast' : 'playlist';
       // 拉取歌单/播客集合
       var r = null;
@@ -14442,7 +14485,9 @@ function makeContentListManager() {
           ? await apiJson('/api/podcast/my/items?key=' + encodeURIComponent(podcastCollectionKey) + '&limit=36')
           : (qqPlaylistId
             ? await apiJson('/api/qq/playlist/tracks?id=' + encodeURIComponent(qqPlaylistId))
-            : await apiJson('/api/playlist/tracks?id=' + encodeURIComponent(playlistId)));
+            : (kugouPlaylistId
+              ? await apiJson('/api/kugou/playlist/tracks?id=' + encodeURIComponent(kugouPlaylistId))
+              : await apiJson('/api/playlist/tracks?id=' + encodeURIComponent(playlistId))));
       } catch (e) {
         if (!open || token !== requestToken) return;
         console.warn('[ShelfContentLoadApi]', playlistId, e);
@@ -14473,6 +14518,7 @@ function makeContentListManager() {
         }
         allTracks = tracks;
         centerTarget = 0; centerSmooth = 0;
+        syncToCurrentPlayback(true);
         panelDirty = true;
         rowsDirty = true;
         startRowsLoadedIntro();
@@ -14564,6 +14610,10 @@ function makeContentListManager() {
       group.scale.setScalar(layout.scale * (1 - intro * (skullDetail ? 0.020 : 0.035)));
       centerSmooth += (centerTarget - centerSmooth) * 0.18;
       if (Math.abs(centerSmooth - centerTarget) < 0.001) centerSmooth = centerTarget;
+      if (currentIdx >= 0 && playQueue && playQueue[currentIdx] && contentSongKey(playQueue[currentIdx]) !== group.userData.lastPlaybackKey) {
+        group.userData.lastPlaybackKey = contentSongKey(playQueue[currentIdx]);
+        syncToCurrentPlayback(false);
+      }
       syncRenderedRows(false);
       if (panel && panel.mesh) {
         var pr = Math.max(0, Math.min(1, (uniforms.uTime.value - openAnimAt) / 0.72));
@@ -14611,6 +14661,7 @@ function makeContentListManager() {
     },
     getRows: function() { return rows; },
     getCenterIdx: function() { return Math.round(centerSmooth); },
+    syncToCurrentPlayback: function(immediate) { return syncToCurrentPlayback(!!immediate); },
     pulseRow: function(row, amount) {
       if (!row) return;
       pulseObjectValue(row, 'fxPulse', amount || 1, 0.42);
@@ -15161,6 +15212,14 @@ function playbackQualityRank(value) {
 function playbackQualityWasDowngraded(requested, resolved) {
   return playbackQualityRank(resolved) < playbackQualityRank(requested);
 }
+function kugouQualityHashesParam(song) {
+  if (!song || !song.qualityHashes) return '';
+  try {
+    return '&qualityHashes=' + encodeURIComponent(JSON.stringify(song.qualityHashes));
+  } catch (e) {
+    return '';
+  }
+}
 function playbackBitrateLabel(br) {
   br = Number(br) || 0;
   if (!br) return '';
@@ -15183,27 +15242,81 @@ function readPlaybackQualityPreference() {
 function savePlaybackQualityPreference() {
   try { localStorage.setItem(PLAYBACK_QUALITY_STORE_KEY, playbackQuality); } catch (e) {}
 }
+function currentPlaybackQualityProvider() {
+  var song = currentIdx >= 0 && playQueue && playQueue[currentIdx] ? playQueue[currentIdx] : null;
+  return songProviderKey(song);
+}
+function playbackQualityLabelForProvider(value, provider) {
+  value = normalizePlaybackQuality(value);
+  if (provider === 'kugou') {
+    if (value === 'jymaster') return '酷狗母带';
+    if (value === 'hires') return 'Hi-Res';
+    if (value === 'lossless') return '无损 SQ';
+    if (value === 'exhigh') return '极高 HQ';
+    if (value === 'standard') return '标准';
+  }
+  return playbackQualityLabel(value);
+}
+function playbackQualityShortLabelForProvider(value, provider) {
+  value = normalizePlaybackQuality(value);
+  if (provider === 'kugou') {
+    if (value === 'jymaster') return '母带';
+    if (value === 'hires') return 'HiRes';
+    if (value === 'lossless') return 'SQ';
+    if (value === 'exhigh') return 'HQ';
+    if (value === 'standard') return 'STD';
+  }
+  return playbackQualityShortLabel(value);
+}
+function updateQualityOptionText(provider) {
+  var map = provider === 'kugou'
+    ? {
+      jymaster: ['酷狗母带', '最高规格 / 有则优先'],
+      hires: ['Hi-Res', '高解析优先'],
+      lossless: ['无损 SQ', 'FLAC 优先'],
+      exhigh: ['极高 HQ', '320kbps / OGG 优先'],
+      standard: ['标准', '128kbps'],
+    }
+    : {
+      jymaster: ['超清母带', 'SVIP / 最高规格'],
+      hires: ['高清臻音', '默认 / 细节优先'],
+      lossless: ['无损 SQ', 'FLAC 优先'],
+      exhigh: ['极高 HQ', '320kbps'],
+      standard: ['标准', '128kbps'],
+    };
+  document.querySelectorAll('.quality-option').forEach(function(option){
+    var q = normalizePlaybackQuality(option.dataset.quality);
+    var text = map[q] || map.hires;
+    var span = option.querySelector('span');
+    var small = option.querySelector('small');
+    if (span) span.textContent = text[0];
+    if (small) small.textContent = text[1];
+  });
+}
 function updatePlaybackQualityUi() {
   var label = document.getElementById('quality-btn-label');
   var btn = document.getElementById('quality-btn');
-  var canUseSvip = hasProviderSvip('netease', loginStatus);
+  var provider = currentPlaybackQualityProvider();
+  var canUseSvip = provider === 'kugou' ? true : hasProviderSvip('netease', loginStatus);
   var displayQuality = playbackQuality === 'jymaster' && !canUseSvip ? 'hires' : playbackQuality;
-  if (label) label.textContent = playbackQualityShortLabel(displayQuality);
+  updateQualityOptionText(provider);
+  if (label) label.textContent = playbackQualityShortLabelForProvider(displayQuality, provider);
   if (btn) btn.title = playbackQuality === 'jymaster' && !canUseSvip
     ? '音质: ' + playbackQualityLabel(displayQuality) + ' · 超清母带需网易云 SVIP'
-    : '音质: ' + playbackQualityLabel(displayQuality);
+    : '音质: ' + playbackQualityLabelForProvider(displayQuality, provider);
   document.querySelectorAll('.quality-option').forEach(function(option){
     var q = normalizePlaybackQuality(option.dataset.quality);
-    var locked = option.dataset.svip === '1' && !canUseSvip;
+    var locked = provider !== 'kugou' && option.dataset.svip === '1' && !canUseSvip;
     option.classList.toggle('active', q === displayQuality);
     option.classList.toggle('locked', locked);
     option.disabled = locked;
-    option.title = locked ? '需要网易云 SVIP 账号' : playbackQualityLabel(q);
+    option.title = locked ? '需要网易云 SVIP 账号' : playbackQualityLabelForProvider(q, provider);
   });
 }
 function setPlaybackQuality(value) {
   var next = normalizePlaybackQuality(value);
-  if (next === 'jymaster' && !hasProviderSvip('netease', loginStatus)) {
+  var provider = currentPlaybackQualityProvider();
+  if (provider !== 'kugou' && next === 'jymaster' && !hasProviderSvip('netease', loginStatus)) {
     showToast(hasPlatformLogin('netease') ? '超清母带需要网易云 SVIP' : '登录网易云 SVIP 后可用超清母带');
     if (!hasPlatformLogin('netease')) openProviderLogin('netease');
     return;
@@ -15220,10 +15333,11 @@ function canReloadCurrentTrackForQuality() {
   if (!audio || !audio.src || audio.paused || audio.ended) return false;
   var song = playQueue[currentIdx];
   if (!song || song.type === 'local' || song.source === 'local') return false;
-  return songProviderKey(song) === 'netease' || songProviderKey(song) === 'qq';
+  return songProviderKey(song) === 'netease' || songProviderKey(song) === 'qq' || songProviderKey(song) === 'kugou';
 }
 function applyPlaybackQualityToCurrentTrack(nextQuality) {
-  var label = playbackQualityLabel(nextQuality || playbackQuality);
+  var provider = currentPlaybackQualityProvider();
+  var label = playbackQualityLabelForProvider(nextQuality || playbackQuality, provider);
   if (!canReloadCurrentTrackForQuality()) {
     showToast('音质偏好: ' + label + ' · 下次播放生效');
     return;
@@ -18429,6 +18543,9 @@ async function playQueueAt(idx, opts) {
   homeForcedOpen = false;
   if (!opts.preserveHomeState) homeSuppressed = false;
   currentIdx = idx;
+  safePlaybackStep('shelf-current-sync', function(){
+    if (shelfManager && shelfManager.syncOpenContentToCurrent) shelfManager.syncOpenContentToCurrent(false);
+  });
   trackSwitchToken++;
   markPlayPhase('cancel-previous-track');
   cancelBeatAnalysisTimer();
@@ -18454,6 +18571,7 @@ async function playQueueAt(idx, opts) {
   safePlaybackStep('cover-button', updateCustomCoverButton);
   safePlaybackStep('like-buttons', function(){ updateLikeButtons(song); });
   safePlaybackStep('like-status', function(){ syncLikeStatusForSong(song); });
+  safePlaybackStep('quality-ui', updatePlaybackQualityUi);
   safePlaybackStep('cinema-track-profile', function(){ resetCinemaTrackProfile(song); });
   safePlaybackStep('empty-home', function(){ if (!opts.preserveHomeState) updateEmptyHomeVisibility(); });
   safePlaybackStep('track-ui', function(){
@@ -18503,7 +18621,7 @@ async function playQueueAt(idx, opts) {
     var data = isQQPlayback
       ? await apiJson('/api/qq/song/url?mid=' + encodeURIComponent(song.mid || song.songmid || song.id || '') + '&mediaMid=' + encodeURIComponent(song.mediaMid || song.media_mid || '') + qualityParam)
       : (isKugouPlayback
-        ? await apiJson('/api/kugou/song/url?hash=' + encodeURIComponent(song.hash || song.id || '') + '&albumAudioId=' + encodeURIComponent(song.albumAudioId || song.album_audio_id || ''))
+        ? await apiJson('/api/kugou/song/url?hash=' + encodeURIComponent(song.hash || song.id || '') + '&albumAudioId=' + encodeURIComponent(song.albumAudioId || song.album_audio_id || '') + '&albumId=' + encodeURIComponent(song.albumId || song.album_id || '') + qualityParam + kugouQualityHashesParam(song))
         : await apiJson('/api/song/url?id=' + song.id + qualityParam));
     if (token !== trackSwitchToken) return;
     if (!data.url) {
@@ -19057,6 +19175,9 @@ async function fetchLyric(songOrId, token) {
       var mid = song.mid || song.songmid || song.id || '';
       var qqId = song.qqId || (/^\d+$/.test(String(song.id || '')) ? song.id : '');
       endpoint = '/api/qq/lyric?mid=' + encodeURIComponent(mid) + '&id=' + encodeURIComponent(qqId);
+    } else if (provider === 'kugou') {
+      var hash = song.hash || song.id || '';
+      endpoint = '/api/kugou/lyric?hash=' + encodeURIComponent(hash) + '&duration=' + encodeURIComponent(song.duration || song.timelength || '');
     } else {
       var songId = song ? song.id : songOrId;
       endpoint = '/api/lyric?id=' + encodeURIComponent(songId);
@@ -23442,21 +23563,36 @@ function startQQLoginStatusAutoRefresh() {
   }, 45000);
 }
 function normalizeKugouLoginStatus(info) {
-  var fallback = { provider: 'kugou', loggedIn: false, preview: true, nickname: '酷狗音乐', userId: '', avatar: '', vipType: 0, playbackKeyReady: false };
+  var fallback = { provider: 'kugou', loggedIn: false, preview: true, nickname: '酷狗音乐', userId: '', avatar: '', vipType: 0, vipLevel: 'none', isVip: false, isSvip: false, vipLabel: '无 VIP', playbackKeyReady: false };
   if (!info || !info.loggedIn) return Object.assign({}, fallback, info || {}, {
     provider: 'kugou',
     loggedIn: false,
     nickname: info && info.nickname || fallback.nickname,
     userId: info && info.userId || '',
-    avatar: info && info.avatar || ''
+    avatar: info && info.avatar || '',
+    vipType: Number(info && (info.vipType || info.vip_type) || 0) || 0,
+    vipLevel: 'none',
+    isVip: false,
+    isSvip: false,
+    vipLabel: '无 VIP',
+    playbackKeyReady: false,
+    preview: true
   });
+  var vipType = Number(info.vipType || info.vip_type || info.viptype || 0) || 0;
+  var isVip = !!info.isVip || vipType > 0;
   return Object.assign({}, fallback, info, {
     provider: 'kugou',
     loggedIn: true,
     nickname: info.nickname || fallback.nickname,
     userId: info.userId || '',
     avatar: info.avatar || '',
-    playbackKeyReady: false
+    vipType: vipType,
+    vipLevel: isVip ? 'vip' : 'none',
+    isVip: isVip,
+    isSvip: !!info.isSvip,
+    vipLabel: isVip ? (info.vipLabel || 'Kugou VIP') : '无 VIP',
+    playbackKeyReady: info.playbackKeyReady !== false,
+    preview: false
   });
 }
 async function refreshKugouLoginStatus() {
@@ -23660,20 +23796,20 @@ updateLoginProviderUi = function() {
   var st = document.getElementById('qr-status');
   var refreshBtn = document.getElementById('refresh-qr-btn');
   if (shell) {
-    shell.classList.add('web-login-preview');
+    shell.classList.remove('web-login-preview');
     shell.classList.remove('netease-preview', 'qq-preview');
   }
-  if (img) img.style.display = 'none';
-  if (qqCard) qqCard.style.display = 'flex';
-  if (desc) desc.innerHTML = 'Open the <b>Kugou official web login window</b>. After you finish login, Mineradio will read the session and sync your Kugou playlists.';
+  if (img) img.style.display = '';
+  if (qqCard) qqCard.style.display = 'none';
+  if (desc) desc.innerHTML = '使用 <b>酷狗音乐 App</b> 扫码登录，成功后 Mineradio 会同步账号信息和酷狗歌单。';
   if (st && !qrKey) {
-    st.textContent = kugouLoginStatus.loggedIn ? ('Kugou logged in · ' + (kugouLoginStatus.nickname || kugouLoginStatus.userId || '')) : 'Click web login and finish login in the Kugou window';
+    st.textContent = kugouLoginStatus.loggedIn ? ('酷狗音乐已登录 · ' + (kugouLoginStatus.nickname || kugouLoginStatus.userId || '')) : '正在生成酷狗登录二维码...';
     st.className = 'preview';
   }
   if (refreshBtn) {
     refreshBtn.disabled = !!kugouWebLoginBusy;
-    refreshBtn.textContent = kugouWebLoginBusy ? 'Waiting...' : 'Kugou Web Login';
-    refreshBtn.onclick = openKugouWebLogin;
+    refreshBtn.textContent = kugouWebLoginBusy ? '等待登录...' : '刷新二维码';
+    refreshBtn.onclick = refreshQr;
   }
   if (qqCard) {
     qqCard.disabled = !!kugouWebLoginBusy;
@@ -23687,7 +23823,43 @@ updateLoginProviderUi = function() {
 var baseRefreshQr = refreshQr;
 refreshQr = async function() {
   if (loginProvider !== 'kugou') return baseRefreshQr();
-  return openKugouWebLogin();
+  stopQrPoll();
+  updateLoginProviderUi();
+  qrKey = null;
+  var kgImg = document.getElementById('qr-img');
+  var kgStatus = document.getElementById('qr-status');
+  if (kgImg) {
+    kgImg.style.display = '';
+    kgImg.src = '';
+  }
+  try {
+    var kgInfo = await refreshKugouLoginStatus();
+    if (kgInfo && kgInfo.loggedIn) {
+      if (kgStatus) {
+        kgStatus.textContent = '酷狗音乐已登录 · ' + (kgInfo.nickname || kgInfo.userId || '');
+        kgStatus.className = 'scan';
+      }
+      return;
+    }
+    if (kgStatus) {
+      kgStatus.textContent = '正在生成酷狗登录二维码...';
+      kgStatus.className = 'preview';
+    }
+    var k = await apiJson('/api/kugou/login/qr/key?t=' + Date.now());
+    if (!k || !k.key || !k.img) throw new Error((k && (k.message || k.error)) || '酷狗二维码生成失败');
+    qrKey = k.key;
+    if (kgImg) kgImg.src = k.img;
+    if (kgStatus) {
+      kgStatus.textContent = '请使用酷狗音乐 App 扫码登录';
+      kgStatus.className = '';
+    }
+    startQrPoll();
+  } catch (e) {
+    if (kgStatus) {
+      kgStatus.textContent = '酷狗二维码生成失败: ' + (e && e.message ? e.message : e);
+      kgStatus.className = 'fail';
+    }
+  }
 };
 function toggleQQCookiePanel() {
   qqManualCookieOpen = !qqManualCookieOpen;
