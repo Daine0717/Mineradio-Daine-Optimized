@@ -18,19 +18,26 @@ license. This modified version keeps the original license and copyright notices.
 
 1. Added Kugou Music account session support.
    - Added Kugou cookie/session storage.
+   - Added Kugou QR login helpers.
    - Added Kugou login status, cookie import, and logout routes.
    - Added `/api/kugou/user/playlists` for user playlist synchronization.
    - Added `/api/kugou/playlist/tracks` for playlist track loading.
    - Added `/api/kugou/song/url` for resolving playable song URLs when possible.
+   - Added `/api/kugou/lyric` for Kugou lyric loading.
 
 2. Added Kugou Music as a third source in the player UI.
    - Added Kugou login tab and account switching entry.
    - Added Kugou playlist group in the playlist panel.
    - Added `KG` source tags for Kugou songs.
    - Added Kugou playlist loading and queue playback support.
+   - Added Kugou account, VIP status, playlist order, lyric, and quality handling.
 
-3. Improved playlist scrolling style.
-   - Added a more transparent, glass-like scrollbar style for the playlist area.
+3. Improved login and player UI.
+   - Unified Netease, QQ Music, and Kugou login entry states.
+   - Shows an account card and logout action when a platform is already logged in.
+   - Improved the QQ Music login entry so it clearly appears as a QR-style login action.
+   - Replaced the temporary home placeholder with a polished player start panel.
+   - Polished the playlist panel and reduced bottom control bar glare.
 
 ## Important Notes
 

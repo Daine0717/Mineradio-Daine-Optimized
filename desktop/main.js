@@ -488,6 +488,7 @@ async function openNeteaseMusicLoginWindow(owner) {
 
     loginWindow.webContents.on('did-finish-load', () => {
       checkCookies();
+      return;
       loginWindow.webContents.executeJavaScript(`
         setTimeout(() => {
           const docs = [document];
