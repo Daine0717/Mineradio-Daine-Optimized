@@ -1,10 +1,12 @@
 # GitHub 仓库简介
 
-Mineradio 优化版是基于 `XxHuberrr/Mineradio` 开发的 Windows 沉浸式音乐播放器个人修改版，支持网易云、QQ、酷狗三平台音乐体验，并加入极简歌词窗口、Home 页面优化和酷狗云端歌单同步。
+Mineradio 优化版是 Daine 基于原创项目 `XxHuberrr/Mineradio` 与二创项目 `zzstar101/Mineradio-Tauri` 继续开发的 Windows 沉浸式音乐播放器，支持网易云、QQ、酷狗三平台音乐体验，并加入极简歌词窗口、Home 页面优化和酷狗云端歌单同步。
 
 原项目：https://github.com/XxHuberrr/Mineradio
 
-本项目继续遵循 GPL-3.0 协议，不代表原作者官方版本。
+二创项目：https://github.com/zzstar101/Mineradio-Tauri
+
+本项目继续遵循 GPL-3.0 协议，不代表原创作者或二创作者的官方版本。
 
 ## GitHub Release 标题
 
@@ -12,7 +14,7 @@ Mineradio 优化版 v2.1.1｜极简歌词窗口与 Home 页面升级
 
 ## GitHub Release 正文
 
-Mineradio 优化版 `2.1.1` 基于开源项目 `XxHuberrr/Mineradio` 修改，并继续遵循 GPL-3.0 协议发布。
+Mineradio 优化版 `2.1.1` 由 Daine 基于 `XxHuberrr/Mineradio` 与 `zzstar101/Mineradio-Tauri` 继续优化，并遵循 GPL-3.0 协议发布。
 
 本版本源码：https://github.com/Daine0717/Mineradio-Daine-Optimized/tree/v2.1.1
 
@@ -37,4 +39,4 @@ Windows 安装包：
 
 ### 说明
 
-本项目为个人学习修改版，不代表原作者官方版本。第三方音乐平台功能仅用于用户自有账号的登录、歌单同步和播放体验，不提供破解会员、绕过版权限制或非法下载音乐等功能。
+本项目为个人学习修改版，不代表原创作者或二创作者的官方版本。第三方音乐平台功能仅用于用户自有账号的登录、歌单同步和播放体验，不提供破解会员、绕过版权限制或非法下载音乐等功能。

@@ -1,6 +1,13 @@
 # Mineradio 优化版修改说明
 
-本项目基于 [XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio) 修改，继续遵循 GPL-3.0 协议并保留原项目版权声明。
+本项目由 Daine 基于原创项目 [XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio) 和二创项目 [zzstar101/Mineradio-Tauri](https://github.com/zzstar101/Mineradio-Tauri) 继续优化，遵循 GPL-3.0 协议并保留来源项目版权声明。
+
+## 2.1.0 主要改动
+
+- 将单文件为主的前端代码拆分为职责明确的模块，完成工程化整理。
+- 修复 Home 页面与播放页 3D 歌单架之间的交叉交互和事件穿透问题。
+- 移除左侧大卡片的天气系统，改为展示每日热门歌曲的副歌歌词。
+- 新增左侧大卡片自定义背景功能。
 
 ## 2.1.1 主要改动
 
@@ -16,4 +23,4 @@
 
 第三方音乐平台功能仅用于用户自有账号的登录、歌单同步、歌词同步和播放体验。本项目不提供 DRM 绕过、会员破解、版权限制规避或非法音乐下载功能。
 
-本修改版不代表原作者官方版本。继续修改或分发时，请遵守 GPL-3.0 协议并保留 `LICENSE`、`NOTICE.md` 和原作者信息。
+本修改版不代表原创作者或二创作者的官方版本。继续修改或分发时，请遵守 GPL-3.0 协议并保留 `LICENSE`、`NOTICE.md` 和来源作者信息。

@@ -3,7 +3,7 @@
   "productName": "Mineradio优化版",
   "version": "2.1.1",
   "description": "沉浸式音乐播放器，融合天气电台、歌词舞台、粒子视觉和 3D 歌单架。",
-  "author": "Mineradio",
+  "author": "Daine",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {

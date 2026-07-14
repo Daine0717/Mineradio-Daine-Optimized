@@ -1,6 +1,6 @@
 # Mineradio 优化版
 
-基于 [XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio) 开发的 Windows Electron 沉浸式音乐播放器个人优化版。保留原版歌词舞台、粒子视觉、3D 歌单架和多平台音乐体验，并加入极简歌词窗口、酷狗音乐同步与界面优化。
+基于原创项目 [XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio) 与二创项目 [zzstar101/Mineradio-Tauri](https://github.com/zzstar101/Mineradio-Tauri) 继续优化的 Windows Electron 沉浸式音乐播放器。当前版本由 Daine 维护，保留歌词舞台、粒子视觉、3D 歌单架和多平台音乐体验，并加入极简歌词窗口、酷狗音乐同步与界面优化。
 
 ## 当前版本
 
@@ -53,7 +53,7 @@ npm run build:win
 
 ## 修改版与版权说明
 
-本仓库是原项目的个人学习修改版本，不代表原作者官方版本。项目继续遵循 GPL-3.0 协议，并保留原项目的 `LICENSE`、`NOTICE.md` 和作者信息。
+本仓库是 Daine 基于原创项目与二创项目继续开发的个人学习优化版本，不代表前述作者的官方版本。项目继续遵循 GPL-3.0 协议，并保留 `LICENSE`、`NOTICE.md` 和来源作者信息。
 
 本项目不是网易云音乐、QQ 音乐或酷狗音乐的官方客户端，与相关平台不存在从属、合作或授权关系。第三方平台功能仅用于用户自有账号的登录、歌单同步和播放体验，不提供破解会员、绕过版权限制或非法下载音乐等功能。
 
@@ -61,4 +61,8 @@ npm run build:win
 
 ## 致谢
 
-感谢原作者 XxHuberrr 及原项目贡献者。原项目地址：[XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio)。
+感谢原创作者 XxHuberrr、二创作者 zzstar101 及相关贡献者。
+
+- 原创项目：[XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio)
+- 二创项目：[zzstar101/Mineradio-Tauri](https://github.com/zzstar101/Mineradio-Tauri)
+- 当前优化与维护：Daine

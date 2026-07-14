@@ -2,16 +2,16 @@
 
 这个文件是给后续接管本工作区的 AI 看的。每次完成一个任务后，都要更新本文件的「工作日志」和「未完成事项」，让下一位接手者能快速知道用户偏好、当前状态和最近做过什么。
 
-## 当前权威入口（2026-06-24）
+## 当前权威入口（2026-07-14）
 
-- 当前真实代码/Git 仓库仍是 `E:\桌面\播放器软件\Mineradio\resources\app`。
-- 当前版本是 `v1.1.0` 纯净安装发布线；本轮已从当前可信源码重新生成并发布 `dist/Mineradio-1.1.0-Setup.exe`。
-- GitHub 仓库已公开：`https://github.com/XxHuberrr/Mineradio`
-- `v1.1.0` Release：`https://github.com/XxHuberrr/Mineradio/releases/tag/v1.1.0`
-- GitHub `/releases/latest` 仍返回 `v1.0.10`，这是刻意设置，避免旧版软件内更新到 1.1.0。
-- `v1.0.10` 及更早旧安装包不再信任，需要在 GitHub Release/README/SECURITY 中标记隔离。
-- `v1.1.0` 不提供从 `v1.0.10` 的软件内本地更新，不上传 `latest.yml`，不生成 `v1.0.10 -> v1.1.0` 快速补丁。
-- 新对话优先读 `AGENTS.md`、`docs/PROJECT_MEMORY.md`、`docs/HANDOFF_NEXT_CHAT.md`；涉及安全重建或发布时再读 `docs/SECURITY_REBUILD_2026-06-24.md`。本文件下面包含较早历史记录，不能覆盖上述文件的当前结论。
+- 当前真实代码/Git 仓库：`D:\Mineradio-Daine优化版项目`。
+- 当前版本：Daine 优化版 `v2.1.1`。
+- 当前 GitHub 仓库：`https://github.com/Daine0717/Mineradio-Daine-Optimized`。
+- 原创来源：[XxHuberrr/Mineradio](https://github.com/XxHuberrr/Mineradio)。
+- 二创参考：[zzstar101/Mineradio-Tauri](https://github.com/zzstar101/Mineradio-Tauri)。
+- 当前优化与维护：Daine；本项目不代表原创作者或二创作者的官方版本。
+- `v2.1.0` 完成工程化拆分，修复 Home 与播放页 3D 歌单架交叉交互，移除左侧大卡片天气系统并改为每日热门歌曲副歌歌词展示，同时加入卡片自定义背景。
+- 新对话优先读 `AGENTS.md`、`docs/PROJECT_MEMORY.md` 和本文件；下面的 `v1.x` 内容仅作为历史记录，不能覆盖当前结论。
 
 ## 用户偏好
 
@@ -74,6 +74,12 @@
 这个目录是人工归档区，不参与软件更新流程。
 
 ## 已完成工作日志
+
+### 2026-07-14
+
+- 将来源说明更新为原创项目 `XxHuberrr/Mineradio`、二创项目 `zzstar101/Mineradio-Tauri` 与当前维护者 Daine 三层关系。
+- 补记 Daine 优化版 `v2.1.0` 的工程化拆分、Home 与 3D 歌单架交互修复、热门歌曲副歌歌词卡片和卡片自定义背景。
+- 当前发布目标为 `Daine0717/Mineradio-Daine-Optimized`，发布资产从当前 `v2.1.1` 源码重新构建。
 
 ### 2026-06-24
 
