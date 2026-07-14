@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog } = require('electron');
 const net = require('net');
+const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { execFile, spawn } = require('child_process');
@@ -22,6 +23,10 @@ let wallpaperState = {};
 let htmlFullscreenActive = false;
 let windowFullscreenActive = false;
 let mainWindowStateTimer = null;
+let minimalModeActive = false;
+let minimalModeTransitioning = false;
+let minimalModeRestoreState = null;
+let minimalModeEdgeCorrection = false;
 const registeredGlobalHotkeys = new Map();
 
 const WINDOWED_ASPECT = 16 / 9;
@@ -29,6 +34,12 @@ const WINDOWED_SCALE = 3 / 4;
 const WINDOWED_MARGIN = 32;
 const MIN_WINDOWED_WIDTH = 960;
 const MIN_WINDOWED_HEIGHT = 540;
+const MINIMAL_WIDTH = 900;
+const MINIMAL_HEIGHT = 150;
+const MINIMAL_MIN_WIDTH = 720;
+const MINIMAL_MIN_HEIGHT = 120;
+const MINIMAL_RESIZE_DELAY = 1600;
+const MINIMAL_RESIZE_MASK_MS = 60;
 const APP_NAME = 'Mineradio';
 const APP_USER_MODEL_ID = 'com.mineradio.desktop';
 const APP_ICON_ICO = path.join(__dirname, '..', 'build', 'icon.ico');
@@ -36,6 +47,8 @@ const NETEASE_LOGIN_PARTITION = 'persist:mineradio-netease-login';
 const NETEASE_LOGIN_URL = 'https://music.163.com/#/login';
 const QQ_LOGIN_PARTITION = 'persist:mineradio-qqmusic-login';
 const QQ_LOGIN_URL = 'https://y.qq.com/n/ryqq/profile';
+const KUGOU_LOGIN_PARTITION = 'persist:mineradio-kugou-login';
+const KUGOU_LOGIN_URL = 'https://www.kugou.com/';
 
 const CHROMIUM_PERFORMANCE_SWITCHES = [
   ['autoplay-policy', 'no-user-gesture-required'],
@@ -88,6 +101,15 @@ const NETEASE_LOGIN_COOKIE_PRIORITY = [
   'WEVNSM',
   'WNMCID',
   'JSESSIONID-WYYY',
+];
+const KUGOU_LOGIN_COOKIE_PRIORITY = [
+  'KuGoo',
+  'kg_mid',
+  'kg_dfid',
+  'KugooID',
+  'userid',
+  'token',
+  't',
 ];
 
 function findOpenPort(startPort) {
@@ -237,6 +259,7 @@ function getWindowState(win) {
     isMinimized: false,
     isVisible: false,
     isFocused: false,
+    isMinimalMode: false,
     isPrimaryDisplay: true,
     hasDisplayOnLeft: false,
     hasDisplayOnRight: false,
@@ -251,6 +274,7 @@ function getWindowState(win) {
     isMinimized: win.isMinimized(),
     isVisible: win.isVisible(),
     isFocused: win.isFocused(),
+    isMinimalMode: minimalModeActive,
     ...getDisplayState(win),
   };
 }
@@ -349,6 +373,13 @@ function neteaseCookieHasLogin(cookieText) {
   return !!obj.MUSIC_U;
 }
 
+function kugouCookieHasLogin(cookieText) {
+  const obj = parseCookieHeader(cookieText);
+  const userId = String(obj.userid || obj.KugooID || obj.kugou_id || '').replace(/\D/g, '');
+  const authToken = obj.token || obj.KuGoo || obj.t || '';
+  return !!(userId && authToken);
+}
+
 function isQQCookieDomain(domain) {
   const normalized = String(domain || '').replace(/^\./, '').toLowerCase();
   return normalized === 'qq.com' || normalized.endsWith('.qq.com') || normalized.endsWith('qqmusic.qq.com');
@@ -359,6 +390,12 @@ function isNeteaseCookieDomain(domain) {
   return normalized === '163.com' || normalized.endsWith('.163.com') ||
     normalized === 'music.163.com' || normalized.endsWith('.music.163.com') ||
     normalized === 'netease.com' || normalized.endsWith('.netease.com');
+}
+
+function isKugouCookieDomain(domain) {
+  const normalized = String(domain || '').replace(/^\./, '').toLowerCase();
+  return normalized === 'kugou.com' || normalized.endsWith('.kugou.com') ||
+    normalized === 'kgimg.com' || normalized.endsWith('.kgimg.com');
 }
 
 function buildCookieHeaderFor(cookies, isAllowedDomain, priority) {
@@ -395,6 +432,11 @@ async function readQQLoginCookieHeader(cookieSession) {
 async function readNeteaseLoginCookieHeader(cookieSession) {
   const cookies = await cookieSession.cookies.get({});
   return buildCookieHeaderFor(cookies, isNeteaseCookieDomain, NETEASE_LOGIN_COOKIE_PRIORITY);
+}
+
+async function readKugouLoginCookieHeader(cookieSession) {
+  const cookies = await cookieSession.cookies.get({});
+  return buildCookieHeaderFor(cookies, isKugouCookieDomain, KUGOU_LOGIN_COOKIE_PRIORITY);
 }
 
 async function openNeteaseMusicLoginWindow(owner) {
@@ -458,6 +500,7 @@ async function openNeteaseMusicLoginWindow(owner) {
 
     loginWindow.webContents.on('did-finish-load', () => {
       checkCookies();
+      return;
       loginWindow.webContents.executeJavaScript(`
         setTimeout(() => {
           const docs = [document];
@@ -600,6 +643,150 @@ async function openQQMusicLoginWindow(owner) {
   });
 }
 
+async function openKugouMusicLoginWindow(owner) {
+  const cookieSession = session.fromPartition(KUGOU_LOGIN_PARTITION);
+  await clearKugouMusicLoginSession();
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let pollTimer = null;
+
+    const loginWindow = new BrowserWindow({
+      width: 920,
+      height: 720,
+      minWidth: 760,
+      minHeight: 560,
+      parent: owner && !owner.isDestroyed() ? owner : undefined,
+      modal: false,
+      show: false,
+      autoHideMenuBar: true,
+      title: 'Kugou Music Login',
+      backgroundColor: '#111111',
+      icon: APP_ICON_ICO,
+      webPreferences: {
+        partition: KUGOU_LOGIN_PARTITION,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+
+    const finish = async (result) => {
+      if (settled) return;
+      settled = true;
+      if (pollTimer) clearInterval(pollTimer);
+      if (loginWindow && !loginWindow.isDestroyed()) {
+        loginWindow.close();
+      }
+      resolve(result);
+    };
+
+    const checkCookies = async () => {
+      try {
+        const cookie = await readKugouLoginCookieHeader(cookieSession);
+        if (kugouCookieHasLogin(cookie)) {
+          finish({ ok: true, cookie });
+        }
+      } catch (e) {
+        console.warn('Kugou login cookie check failed:', e.message);
+      }
+    };
+
+    const localJson = (pathname) => new Promise((ok, fail) => {
+      const port = mainServerPort || Number(process.env.PORT) || 3000;
+      const req = http.get(`http://127.0.0.1:${port}${pathname}`, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const data = body ? JSON.parse(body) : {};
+            if (res.statusCode >= 400) {
+              const err = new Error(data.message || data.error || `HTTP_${res.statusCode}`);
+              err.data = data;
+              fail(err);
+              return;
+            }
+            ok(data);
+          } catch (e) {
+            fail(e);
+          }
+        });
+      });
+      req.setTimeout(12000, () => req.destroy(new Error('Kugou login request timeout')));
+      req.on('error', fail);
+    });
+
+    const startKugouQrLogin = async () => {
+      try {
+        const qr = await localJson('/api/kugou/login/qr/key?t=' + Date.now());
+        const key = qr && (qr.key || qr.qrcode);
+        if (!key || !qr.url) throw new Error('Kugou QR login URL missing');
+        await loginWindow.loadURL(qr.url);
+        const pollLogin = async () => {
+          try {
+            const data = await localJson('/api/kugou/login/qr/check?key=' + encodeURIComponent(key) + '&t=' + Date.now());
+            if (data && data.code === 803 && data.loggedIn) {
+              finish(Object.assign({ ok: true }, data));
+            } else if (data && data.code === 800) {
+              finish({ ok: false, error: data.message || 'Kugou QR expired, please try again' });
+            }
+          } catch (e) {
+            console.warn('Kugou QR login check failed:', e.message);
+          }
+        };
+        pollTimer = setInterval(pollLogin, 1200);
+        pollLogin();
+      } catch (e) {
+        console.warn('Kugou QR login failed, falling back to web home:', e.message);
+        pollTimer = setInterval(checkCookies, 1200);
+        loginWindow.loadURL(KUGOU_LOGIN_URL).catch((err) => finish({ ok: false, error: err.message }));
+      }
+    };
+
+    loginWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\/([^/]+\.)?kugou\.com/i.test(url) || /^https?:\/\/([^/]+\.)?kgimg\.com/i.test(url)) {
+        loginWindow.loadURL(url).catch((e) => console.warn('Kugou login popup navigation failed:', e.message));
+      } else if (/^https?:\/\//i.test(url)) {
+        shell.openExternal(url).catch(() => {});
+      }
+      return { action: 'deny' };
+    });
+
+    loginWindow.webContents.on('did-finish-load', () => {
+      checkCookies();
+      loginWindow.webContents.executeJavaScript(`
+        setTimeout(() => {
+          const nodes = Array.from(document.querySelectorAll('a, button, span, div'));
+          const loginNode = nodes.find((node) => {
+            const text = (node.textContent || '').trim();
+            if (!/登录|登陆|立即登录/.test(text)) return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+          if (loginNode) loginNode.click();
+        }, 700);
+      `, true).catch(() => {});
+    });
+
+    loginWindow.on('ready-to-show', () => loginWindow.show());
+    loginWindow.on('closed', async () => {
+      if (settled) return;
+      if (pollTimer) clearInterval(pollTimer);
+      try {
+        const cookie = await readKugouLoginCookieHeader(cookieSession);
+        resolve(kugouCookieHasLogin(cookie)
+          ? { ok: true, cookie }
+          : { ok: false, cancelled: true, message: 'Kugou login window closed' });
+      } catch (e) {
+        resolve({ ok: false, error: e.message || 'Kugou login window closed' });
+      }
+    });
+
+    startKugouQrLogin();
+  });
+}
+
 async function clearQQMusicLoginSession() {
   const cookieSession = session.fromPartition(QQ_LOGIN_PARTITION);
   await cookieSession.clearStorageData({
@@ -610,6 +797,14 @@ async function clearQQMusicLoginSession() {
 
 async function clearNeteaseMusicLoginSession() {
   const cookieSession = session.fromPartition(NETEASE_LOGIN_PARTITION);
+  await cookieSession.clearStorageData({
+    storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage'],
+  });
+  return { ok: true };
+}
+
+async function clearKugouMusicLoginSession() {
+  const cookieSession = session.fromPartition(KUGOU_LOGIN_PARTITION);
   await cookieSession.clearStorageData({
     storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage'],
   });
@@ -661,10 +856,89 @@ function getWindowedBounds(win) {
 
 function applyWindowedBounds(win) {
   if (!win || win.isDestroyed()) return;
+  if (minimalModeActive || minimalModeTransitioning) return;
   if (win.isMaximized()) win.unmaximize();
   win.setMinimumSize(MIN_WINDOWED_WIDTH, MIN_WINDOWED_HEIGHT);
   win.setBounds(getWindowedBounds(win), false);
   sendWindowState(win);
+}
+
+function compactBounds(win) {
+  const area = screen.getDisplayMatching(win.getBounds()).workArea;
+  const current = win.getBounds();
+  const width = Math.min(MINIMAL_WIDTH, Math.max(MINIMAL_MIN_WIDTH, area.width - WINDOWED_MARGIN));
+  const height = Math.min(MINIMAL_HEIGHT, Math.max(MINIMAL_MIN_HEIGHT, area.height - WINDOWED_MARGIN));
+  return {
+    x: Math.max(area.x, Math.min(area.x + area.width - width, Math.round(current.x + (current.width - width) / 2))),
+    y: Math.max(area.y, Math.min(area.y + area.height - height, Math.round(current.y + current.height - height))),
+    width,
+    height,
+  };
+}
+
+function clampMinimalBounds(bounds) {
+  const area = screen.getDisplayMatching(bounds).workArea;
+  return {
+    ...bounds,
+    x: Math.max(area.x, Math.min(area.x + area.width - bounds.width, bounds.x)),
+    y: Math.max(area.y, Math.min(area.y + area.height - bounds.height, bounds.y)),
+  };
+}
+
+async function setWindowBoundsAfterDelay(win, target, maskOldFrame = false) {
+  await new Promise((resolve) => setTimeout(resolve, MINIMAL_RESIZE_DELAY));
+  if (!win || win.isDestroyed()) return;
+  if (!maskOldFrame) {
+    win.setBounds(target, false);
+    return;
+  }
+  const opacity = win.getOpacity();
+  win.setOpacity(0);
+  try {
+    win.setBounds(target, false);
+    await new Promise((resolve) => setTimeout(resolve, MINIMAL_RESIZE_MASK_MS));
+  } finally {
+    if (!win.isDestroyed()) win.setOpacity(opacity);
+  }
+}
+
+async function setMinimalMode(win, enabled) {
+  if (!win || win.isDestroyed() || minimalModeTransitioning || enabled === minimalModeActive) return getWindowState(win);
+  minimalModeTransitioning = true;
+  try {
+    if (enabled) {
+      minimalModeRestoreState = {
+        bounds: win.getNormalBounds(),
+        maximized: win.isMaximized(),
+        fullscreen: win.isFullScreen(),
+        resizable: win.isResizable(),
+        minimumSize: win.getMinimumSize(),
+      };
+      if (win.isFullScreen()) {
+        win.setFullScreen(false);
+        await new Promise((resolve) => setTimeout(resolve, 180));
+      }
+      if (win.isMaximized()) win.unmaximize();
+      win.setMinimumSize(MINIMAL_MIN_WIDTH, MINIMAL_MIN_HEIGHT);
+      win.setResizable(false);
+      await setWindowBoundsAfterDelay(win, compactBounds(win));
+    } else {
+      const restore = minimalModeRestoreState;
+      if (restore && restore.bounds) await setWindowBoundsAfterDelay(win, restore.bounds, true);
+      if (restore) {
+        win.setMinimumSize(restore.minimumSize[0], restore.minimumSize[1]);
+        win.setResizable(restore.resizable);
+        if (restore.maximized) win.maximize();
+        if (restore.fullscreen) win.setFullScreen(true);
+      }
+      minimalModeRestoreState = null;
+    }
+    minimalModeActive = enabled;
+  } finally {
+    minimalModeTransitioning = false;
+    sendWindowState(win);
+  }
+  return getWindowState(win);
 }
 
 function exitFullscreenToWindow(win) {
@@ -1113,6 +1387,10 @@ ipcMain.handle('desktop-window-exit-fullscreen-windowed', (event) => {
   exitFullscreenToWindow(getSenderWindow(event));
 });
 
+ipcMain.handle('desktop-window-set-minimal-mode', (event, enabled) => {
+  return setMinimalMode(getSenderWindow(event), !!enabled);
+});
+
 ipcMain.handle('desktop-window-get-state', (event) => {
   return getWindowState(getSenderWindow(event));
 });
@@ -1174,6 +1452,14 @@ ipcMain.handle('qq-music-open-login', async (event) => {
 
 ipcMain.handle('qq-music-clear-login', async () => {
   return clearQQMusicLoginSession();
+});
+
+ipcMain.handle('kugou-music-open-login', async (event) => {
+  return openKugouMusicLoginWindow(getSenderWindow(event));
+});
+
+ipcMain.handle('kugou-music-clear-login', async () => {
+  return clearKugouMusicLoginSession();
 });
 
 ipcMain.handle('mineradio-open-update-installer', async (_event, filePath) => {
@@ -1320,6 +1606,10 @@ ipcMain.handle('mineradio-wallpaper-update', async (_event, payload) => {
 async function createWindow() {
   htmlFullscreenActive = false;
   windowFullscreenActive = false;
+  minimalModeActive = false;
+  minimalModeTransitioning = false;
+  minimalModeRestoreState = null;
+  minimalModeEdgeCorrection = false;
   const port = await findOpenPort(3000);
   mainServerPort = port;
 
@@ -1327,6 +1617,7 @@ async function createWindow() {
   process.env.PORT = String(port);
   process.env.COOKIE_FILE = path.join(app.getPath('userData'), '.cookie');
   process.env.QQ_COOKIE_FILE = path.join(app.getPath('userData'), '.qq-cookie');
+  process.env.KUGOU_COOKIE_FILE = path.join(app.getPath('userData'), '.kugou-cookie');
   process.env.MINERADIO_UPDATE_DIR = getUpdateDownloadDir();
   try {
     const legacyQQCookie = path.join(__dirname, '..', '.qq-cookie');
@@ -1397,6 +1688,15 @@ async function createWindow() {
   mainWindow.on('focus', () => sendWindowState(mainWindow));
   mainWindow.on('blur', () => sendWindowState(mainWindow));
   mainWindow.on('move', () => scheduleWindowStateSend(mainWindow));
+  mainWindow.on('will-move', (event, bounds) => {
+    if (!bounds || !minimalModeActive || minimalModeTransitioning || minimalModeEdgeCorrection) return;
+    const next = clampMinimalBounds(bounds);
+    if (next.x === bounds.x && next.y === bounds.y) return;
+    event.preventDefault();
+    minimalModeEdgeCorrection = true;
+    try { mainWindow.setBounds(next, false); }
+    finally { minimalModeEdgeCorrection = false; }
+  });
   mainWindow.on('resize', () => scheduleWindowStateSend(mainWindow));
   mainWindow.on('closed', () => {
     if (mainWindowStateTimer) {
@@ -1412,7 +1712,8 @@ async function createWindow() {
   });
   mainWindow.on('leave-full-screen', () => {
     windowFullscreenActive = false;
-    setTimeout(() => applyWindowedBounds(mainWindow), 50);
+    if (minimalModeActive || minimalModeTransitioning) sendWindowState(mainWindow);
+    else setTimeout(() => applyWindowedBounds(mainWindow), 50);
   });
   mainWindow.on('enter-html-full-screen', () => {
     htmlFullscreenActive = true;

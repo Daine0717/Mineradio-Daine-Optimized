@@ -1,0 +1,176 @@
+function readSavedVolume() {
+  try {
+    var v = parseFloat(localStorage.getItem('apex-player-volume'));
+    return isFinite(v) ? Math.max(0, Math.min(1, v)) : 1.0;
+  } catch (e) {
+    return 1.0;
+  }
+}
+function readDiyModePreference() {
+  try { return localStorage.getItem(DIY_MODE_STORE_KEY) === '1'; } catch (e) { return false; }
+}
+function saveDiyModePreference(on) {
+  try { localStorage.setItem(DIY_MODE_STORE_KEY, on ? '1' : '0'); } catch (e) {}
+}
+function readBooleanPreference(key, fallback) {
+  try {
+    var raw = localStorage.getItem(key);
+    if (raw == null) return !!fallback;
+    return raw === '1';
+  } catch (e) {
+    return !!fallback;
+  }
+}
+function saveBooleanPreference(key, on) {
+  try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+}
+function applyUserCapsuleAutoHideState() {
+  document.body.classList.toggle('user-capsule-auto-hide', !!userCapsuleAutoHide);
+  var btn = document.getElementById('user-capsule-hide-btn');
+  if (btn) {
+    btn.classList.toggle('on', !!userCapsuleAutoHide);
+    btn.textContent = userCapsuleAutoHide ? '›' : '‹';
+    btn.title = userCapsuleAutoHide ? '取消自动隐藏账号胶囊' : '自动隐藏账号胶囊';
+  }
+}
+function toggleUserCapsuleAutoHide(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  userCapsuleAutoHide = !userCapsuleAutoHide;
+  saveBooleanPreference(USER_CAPSULE_AUTO_HIDE_STORE_KEY, userCapsuleAutoHide);
+  applyUserCapsuleAutoHideState();
+  showToast(userCapsuleAutoHide ? '账号胶囊已自动隐藏' : '账号胶囊已固定显示');
+}
+function updateUserCapsuleAutoHideFromPointer(x, y) {
+  if (!userCapsuleAutoHide || immersiveMode) {
+    document.body.classList.remove('user-capsule-peek');
+    return;
+  }
+  var nearTopRight = x > innerWidth - 112 && y < 126;
+  document.body.classList.toggle('user-capsule-peek', nearTopRight);
+}
+function applyFxFabAutoHideState(opts) {
+  opts = opts || {};
+  document.body.classList.toggle('fx-fab-auto-hide', !!fxFabAutoHide);
+  if (!fxFabAutoHide) {
+    document.body.classList.remove('fx-fab-peek');
+    fxFabAutoHideRevealArmed = true;
+  } else if (opts.forceHidden) {
+    document.body.classList.remove('fx-fab-peek');
+    fxFabAutoHideRevealArmed = false;
+  }
+  var btn = document.getElementById('fx-fab-hide-btn');
+  if (btn) {
+    btn.classList.toggle('on', !!fxFabAutoHide);
+    btn.textContent = fxFabAutoHide ? '›' : '‹';
+    btn.title = fxFabAutoHide ? '取消自动隐藏视觉控制台' : '自动隐藏视觉控制台';
+  }
+}
+function toggleFxFabAutoHide(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  fxFabAutoHide = !fxFabAutoHide;
+  saveBooleanPreference(FX_FAB_AUTO_HIDE_STORE_KEY, fxFabAutoHide);
+  applyFxFabAutoHideState({ forceHidden: fxFabAutoHide });
+  showToast(fxFabAutoHide ? '视觉控制台按钮已自动隐藏' : '视觉控制台按钮已固定显示');
+}
+function updateFxFabAutoHideFromPointer(x, y) {
+  if (!fxFabAutoHide || !diyPlayerMode || immersiveMode) {
+    document.body.classList.remove('fx-fab-peek');
+    fxFabAutoHideRevealArmed = true;
+    return;
+  }
+  var panel = document.getElementById('fx-panel');
+  var panelOpen = !!(panel && (panel.classList.contains('peek') || panel.classList.contains('show')));
+  var nearBottomRight = x > innerWidth - 126 && y > innerHeight - 158;
+  if (!nearBottomRight) fxFabAutoHideRevealArmed = true;
+  document.body.classList.toggle('fx-fab-peek', panelOpen || (nearBottomRight && fxFabAutoHideRevealArmed));
+}
+function layoutFullscreenDiyZone() {
+  var width = innerWidth < 820 ? 104 : 128;
+  var height = innerWidth < 720 ? 48 : 52;
+  var left = innerWidth - 510;
+  var top = 24;
+  var anchor = document.querySelector('#top-right .top-account-pill') || document.getElementById('user-btn') || document.getElementById('top-right');
+  if (anchor) {
+    var rect = anchor.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      var gap = innerWidth < 820 ? 8 : 12;
+      left = rect.left + rect.width / 2 - width / 2;
+      top = rect.bottom + gap;
+    }
+  }
+  left = Math.max(12, Math.min(innerWidth - width - 12, left));
+  top = Math.max(8, Math.min(innerHeight - height - 8, top));
+  document.documentElement.style.setProperty('--fullscreen-diy-left', left.toFixed(1) + 'px');
+  document.documentElement.style.setProperty('--fullscreen-diy-top', top.toFixed(1) + 'px');
+  document.documentElement.style.setProperty('--fullscreen-diy-width', width + 'px');
+  return { left: left, top: top, width: width, height: height };
+}
+function shouldSuppressFullscreenDiyPeek() {
+  var fxPanel = document.getElementById('fx-panel');
+  var hotkeyModal = document.getElementById('hotkey-modal');
+  var fxPanelOpen = !!(fxPanel && (fxPanel.classList.contains('peek') || fxPanel.classList.contains('show')));
+  var hotkeyOpen = !!(hotkeyModal && hotkeyModal.classList.contains('show'));
+  return !!(visualGuideActive || fxPanelOpen || hotkeyOpen);
+}
+function updateFullscreenDiyPeekFromPointer(x, y) {
+  var isFullscreen = !!(desktopRuntimeState.fullscreen || desktopFullscreenActive || document.fullscreenElement || document.body.classList.contains('desktop-fullscreen'));
+  if (!isFullscreen || immersiveMode || shouldSuppressFullscreenDiyPeek()) {
+    document.body.classList.remove('fullscreen-diy-peek');
+    return;
+  }
+  var rect = layoutFullscreenDiyZone();
+  var anchor = document.querySelector('#top-right .top-account-pill') || document.getElementById('user-btn') || document.getElementById('top-right');
+  var anchorRect = anchor ? anchor.getBoundingClientRect() : rect;
+  var hitLeft = Math.min(rect.left, anchorRect.left) - 26;
+  var hitRight = Math.max(rect.left + rect.width, anchorRect.right) + 26;
+  var hitTop = Math.min(rect.top, anchorRect.top) - 18;
+  var hitBottom = Math.max(rect.top + rect.height, anchorRect.bottom) + 16;
+  var active = x >= hitLeft && x <= hitRight && y >= hitTop && y <= hitBottom;
+  document.body.classList.toggle('fullscreen-diy-peek', active);
+}
+function isDiyMode() {
+  return !!diyPlayerMode;
+}
+function syncDiyModeButton() {
+  ['diy-mode-btn', 'fullscreen-diy-btn'].forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.toggle('on', diyPlayerMode);
+    btn.setAttribute('aria-pressed', diyPlayerMode ? 'true' : 'false');
+    btn.title = diyPlayerMode ? '关闭 DIY 玩家模式' : '开启 DIY 玩家模式';
+    btn.setAttribute('aria-label', btn.title);
+  });
+}
+function applyDiyMode(on, opts) {
+  opts = opts || {};
+  diyPlayerMode = !!on;
+  document.documentElement.classList.toggle('diy-mode-preload', diyPlayerMode);
+  document.documentElement.classList.toggle('simple-mode-preload', !diyPlayerMode);
+  document.body.classList.toggle('diy-mode', diyPlayerMode);
+  document.body.classList.toggle('simple-mode', !diyPlayerMode);
+  syncDiyModeButton();
+  if (opts.save) saveDiyModePreference(diyPlayerMode);
+  if (!diyPlayerMode) {
+    toggleFxPanel(false);
+    togglePlaylistPanel(false);
+    closeUploadTip(false);
+    var quality = document.getElementById('quality-control');
+    var volume = document.getElementById('volume-control');
+    if (quality) quality.classList.remove('open');
+    if (volume) volume.classList.remove('open');
+  }
+  if (opts.toast) showToast(diyPlayerMode ? 'DIY 玩家模式已开启' : '已切回简约模式');
+  if (opts.animate && window.gsap) {
+    ['diy-mode-btn', 'fullscreen-diy-btn'].forEach(function(id) {
+      var btn = document.getElementById(id);
+      if (btn) window.gsap.fromTo(btn, { scale: 0.94 }, { scale: 1, duration: 0.34, ease: 'back.out(1.8)', overwrite: true });
+    });
+  }
+}
+function toggleDiyMode() {
+  applyDiyMode(!diyPlayerMode, { save: true, toast: true, animate: true });
+  if (visualGuideActive) {
+    visualGuideState.mode = diyPlayerMode ? 'diy' : 'simple';
+    showVisualGuideStep(0);
+  }
+}
