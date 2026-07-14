@@ -14,7 +14,7 @@ Mineradio 优化版 v2.1.1｜极简歌词窗口与 Home 页面升级
 
 Mineradio 优化版 `2.1.1` 基于开源项目 `XxHuberrr/Mineradio` 修改，并继续遵循 GPL-3.0 协议发布。
 
-本版本源码：https://github.com/zws84952324-create/Mineradio-Kugou-Modified/tree/v2.1.1
+本版本源码：https://github.com/Daine0717/Mineradio-Daine-Optimized/tree/v2.1.1
 
 ### 本次更新
 

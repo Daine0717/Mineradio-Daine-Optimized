@@ -65,16 +65,16 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "zws84952324-create",
-        "repo": "Mineradio-Kugou-Modified"
+        "owner": "Daine0717",
+        "repo": "Mineradio-Daine-Optimized"
       }
     ]
   },
   "mineradio": {
     "update": {
       "provider": "github",
-      "owner": "zws84952324-create",
-      "repo": "Mineradio-Kugou-Modified",
+      "owner": "Daine0717",
+      "repo": "Mineradio-Daine-Optimized",
       "preview": true,
       "preferMirrors": true,
       "mirrors": [

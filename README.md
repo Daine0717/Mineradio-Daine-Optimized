@@ -24,7 +24,7 @@
 
 ## 安装
 
-Windows 用户请在 [Releases](https://github.com/zws84952324-create/Mineradio-Kugou-Modified/releases) 下载：
+Windows 用户请在 [Releases](https://github.com/Daine0717/Mineradio-Daine-Optimized/releases) 下载：
 
 `Mineradio优化版-2.1.1-Setup.exe`
 
