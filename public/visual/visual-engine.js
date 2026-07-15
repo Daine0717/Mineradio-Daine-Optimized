@@ -886,6 +886,12 @@ var skullBaseColors = {
   neutralShadow: new THREE.Color('#070b12'),
   neutralLight: new THREE.Color('#d6f3ff')
 };
+var skullTintMixColors = {
+  soft: new THREE.Color('#e8f5ff'),
+  bright: new THREE.Color('#fff7d6'),
+  brightCustom: new THREE.Color('#f6fbff'),
+  dark: new THREE.Color('#05070c')
+};
 var skullTintScratch = {
   tint: new THREE.Color(),
   soft: new THREE.Color(),
@@ -915,9 +921,9 @@ function syncSkullParticleColors() {
   var custom = !!tint.custom;
   var strength = clampRange(Number(tint.strength) || 0, 0, custom ? 0.99 : 0.78);
   skullTintScratch.tint.set(tint.color);
-  skullTintScratch.soft.copy(skullTintScratch.tint).lerp(new THREE.Color('#e8f5ff'), custom ? 0.05 : 0.28);
-  skullTintScratch.bright.copy(skullTintScratch.tint).lerp(new THREE.Color(custom ? '#f6fbff' : '#fff7d6'), custom ? 0.14 : 0.46);
-  skullTintScratch.dark.copy(skullTintScratch.tint).lerp(new THREE.Color('#05070c'), custom ? 0.74 : 0.72);
+  skullTintScratch.soft.copy(skullTintScratch.tint).lerp(skullTintMixColors.soft, custom ? 0.05 : 0.28);
+  skullTintScratch.bright.copy(skullTintScratch.tint).lerp(custom ? skullTintMixColors.brightCustom : skullTintMixColors.bright, custom ? 0.14 : 0.46);
+  skullTintScratch.dark.copy(skullTintScratch.tint).lerp(skullTintMixColors.dark, custom ? 0.74 : 0.72);
   skullTintScratch.boneA.copy(custom ? skullBaseColors.neutralBoneA : skullBaseColors.boneA).lerp(skullTintScratch.soft, strength * (custom ? 0.99 : 0.64));
   skullTintScratch.boneB.copy(custom ? skullBaseColors.neutralBoneB : skullBaseColors.boneB).lerp(skullTintScratch.bright, strength * (custom ? 0.94 : 0.46));
   skullTintScratch.shadow.copy(custom ? skullBaseColors.neutralShadow : skullBaseColors.shadow).lerp(skullTintScratch.dark, strength * (custom ? 0.72 : 0.42));

@@ -1,0 +1,30 @@
+const assert = require('assert');
+const fs = require('fs');
+
+const panel = fs.readFileSync('public/ui/playlist-panel.js', 'utf8');
+const template = fs.readFileSync('public/ui/playlist-panel-template.js', 'utf8');
+const css = fs.readFileSync('public/ui/playlist-panel.css', 'utf8');
+const polish = fs.readFileSync('public/ui/playlist-panel-polish.css', 'utf8');
+const interaction = fs.readFileSync('public/system/interaction-engine.js', 'utf8');
+const home = fs.readFileSync('public/ui/home-engine.js', 'utf8');
+
+assert(template.includes('id="playlist-panel-top-btn"'));
+assert(!panel.includes('data-pl-detail-top'));
+assert(panel.includes("button.classList.toggle('show', panel.scrollTop >"));
+assert(css.includes('.playlist-panel-top-btn.show'));
+assert(template.includes('queueShuffle.remove()'));
+assert(panel.includes('data-pl-detail-shuffle'));
+assert(panel.includes('playQueue = tracks.map(cloneSong);\n  shuffleQueue();'));
+assert(panel.includes("panel.dataset.pointerCloseArmed = '0'"));
+assert(interaction.includes("if (panel && panel.dataset.pointerCloseArmed === '0') return false;"));
+assert(interaction.includes('return isPlaylistPanelOpen(pp);'));
+assert(home.includes("openPlaylistPanelTab('playlists', true, 'home-library')"));
+assert(panel.includes('class="pl-card-hitbox'));
+assert(css.includes('.pl-card-hitbox.is-pointer-over .pl-card{transform:translateY(-1px)'));
+assert(panel.includes("animateVisiblePanelList($pl, '.pl-card-hitbox'"));
+assert(!panel.includes("animateVisiblePanelList($pl, '.pl-card',"));
+assert(!polish.includes('.pl-card:hover::after'));
+assert(home.includes("addEventListener('pointerenter'"));
+assert(home.includes("addEventListener('pointerleave'"));
+assert(!home.includes("addEventListener('mouseover'"));
+console.log('playlist panel top button checks passed');

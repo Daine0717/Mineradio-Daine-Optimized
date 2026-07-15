@@ -106,6 +106,18 @@ document.addEventListener('keydown', function(e){
 // ============================================================
 var PEEK_HIDE_DELAY = 170;
 var peekTimers = { search:null, fx:null, pl:null };
+function isPlaylistPanelOpen(panel) {
+  return !!(panel && (panel.classList.contains('peek') || panel.classList.contains('show')));
+}
+function syncPlaylistPanelCameraFocus(panel, immediate) {
+  if (typeof setFocusZone !== 'function') return;
+  if (isPlaylistPanelOpen(panel)) {
+    setFocusZone('queue', immediate);
+    return;
+  }
+  var shelfDetailOpen = !!(shelfManager && shelfManager.hasOpenContent && shelfManager.hasOpenContent());
+  setFocusZone(shelfDetailOpen ? 'shelf-detail' : (shelfPinnedOpen ? 'shelf-side' : null), immediate);
+}
 function setPeek(el, on, key) {
   if (!el) return;
   if (immersiveMode && on && (key === 'search' || key === 'fx')) return;
@@ -126,6 +138,7 @@ function setPeek(el, on, key) {
       delete el.dataset.preserveTabOnOpen;
     }
     el.classList.add('peek');
+    if (key === 'pl') syncPlaylistPanelCameraFocus(el, !wasPeek);
     if (key === 'pl' && !wasPeek) {
       scheduleUiWarmTask(function(){
         flushDeferredQueuePanel('playlist-panel-peek');
@@ -140,6 +153,11 @@ function setPeek(el, on, key) {
     if (peekTimers[key]) clearTimeout(peekTimers[key]);
     peekTimers[key] = setTimeout(function(){
       el.classList.remove('peek');
+      if (key === 'pl') {
+        delete el.dataset.buttonOpenSource;
+        el.dataset.pointerCloseArmed = '1';
+        syncPlaylistPanelCameraFocus(el, true);
+      }
       if (key === 'fx') {
         var fabOff = document.getElementById('fx-fab');
         if (fabOff && !el.classList.contains('show')) fabOff.classList.remove('active');
@@ -284,12 +302,13 @@ function playlistPanelFocusPadding() {
 }
 function shouldClosePlaylistPanelFromPointer(ppOn, ex, ppRect) {
   if (!ppOn) return false;
+  var panel = document.getElementById('playlist-panel');
+  if (panel && panel.dataset.pointerCloseArmed === '0') return false;
   if (isSecondaryLeftDisplaySeamGuardActive() && ex < SECONDARY_PLAYLIST_SEAM_CLOSE_X) return true;
   return ex > ppRect.right + playlistPanelExitPadding();
 }
-function isPlaylistPanelFocusActive(inTrigger, inPanel, pp, ex, ppRect) {
-  if (isSecondaryLeftDisplaySeamGuardActive() && ex < SECONDARY_PLAYLIST_SEAM_CLOSE_X) return false;
-  return inTrigger || inPanel || (pp && pp.classList.contains('peek') && ex < ppRect.right + playlistPanelFocusPadding());
+function isPlaylistPanelFocusActive(pp) {
+  return isPlaylistPanelOpen(pp);
 }
 window.addEventListener('mousemove', function(e){
   var sa = document.getElementById('search-area');
@@ -313,11 +332,12 @@ window.addEventListener('mousemove', function(e){
     var ppRectImm = pp.getBoundingClientRect();
     var inQueueTriggerImm = isPlaylistEdgeTrigger(ex, ey, H);
     var inQueuePanelImm = ppOnImm && ex >= ppRectImm.left - 18 && ex <= ppRectImm.right + 24 && ey >= ppRectImm.top - 22 && ey <= ppRectImm.bottom + 22;
+    if (inQueuePanelImm && pp.dataset.pointerCloseArmed === '0') pp.dataset.pointerCloseArmed = '1';
     if (inQueueTriggerImm || inQueuePanelImm) setPeek(pp, true, 'pl');
     else if (shouldClosePlaylistPanelFromPointer(ppOnImm, ex, ppRectImm)) setPeek(pp, false, 'pl');
     var shelfCanFocusImm = !!(shelfManager && shelfManager.canInteract && shelfManager.canInteract());
     var newFocusImm = null;
-    var queueFocusImm = isPlaylistPanelFocusActive(inQueueTriggerImm, inQueuePanelImm, pp, ex, ppRectImm);
+    var queueFocusImm = isPlaylistPanelFocusActive(pp);
     var shelfHoverFocusImm = !!(shelfCanFocusImm && isSideShelfFocusHit(e));
     if (queueFocusImm) newFocusImm = 'queue';
     else if (shelfManager && shelfManager.hasOpenContent && shelfManager.hasOpenContent()) newFocusImm = 'shelf-detail';
@@ -343,6 +363,7 @@ window.addEventListener('mousemove', function(e){
   var ppRect = pp.getBoundingClientRect();
   var inQueueTrigger = isPlaylistEdgeTrigger(ex, ey, H);
   var inQueuePanel = ppOn && ex >= ppRect.left - 18 && ex <= ppRect.right + 24 && ey >= ppRect.top - 22 && ey <= ppRect.bottom + 22;
+  if (inQueuePanel && pp.dataset.pointerCloseArmed === '0') pp.dataset.pointerCloseArmed = '1';
   if (inQueueTrigger || inQueuePanel) setPeek(pp, true, 'pl');
   else if (shouldClosePlaylistPanelFromPointer(ppOn, ex, ppRect)) setPeek(pp, false, 'pl');
 
@@ -356,7 +377,7 @@ window.addEventListener('mousemove', function(e){
   }
 
   var newFocus = null;
-  var queueFocusActive = isPlaylistPanelFocusActive(inQueueTrigger, inQueuePanel, pp, ex, ppRect);
+  var queueFocusActive = isPlaylistPanelFocusActive(pp);
   var shelfHoverFocus = !!(shelfCanFocus && isSideShelfFocusHit(e));
   if (queueFocusActive) {
     newFocus = 'queue';

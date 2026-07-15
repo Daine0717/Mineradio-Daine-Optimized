@@ -129,7 +129,7 @@ html.control-glass-svg-ok #bottom-bar.visible{
 .home-card,.home-tile,.home-mosaic-cell{border-color:color-mix(in srgb,var(--home-accent) 22%,rgba(255,255,255,.080));box-shadow:0 20px 64px rgba(0,0,0,.28),0 0 26px color-mix(in srgb,var(--home-accent) 8%,transparent),inset 0 1px 0 rgba(255,255,255,.060)}
 .home-card{background:linear-gradient(142deg,color-mix(in srgb,var(--home-accent) 13%,rgba(18,21,26,.66)),rgba(8,9,13,.76))}
 .home-card::before{background:linear-gradient(118deg,color-mix(in srgb,var(--home-accent) 24%,transparent),transparent 38%,color-mix(in srgb,var(--home-accent) 14%,transparent) 74%,transparent),linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 38px)}
-.home-card:hover,.home-tile:hover{border-color:color-mix(in srgb,var(--home-accent) 44%,rgba(255,255,255,.18));box-shadow:0 26px 78px rgba(0,0,0,.34),0 0 34px color-mix(in srgb,var(--home-accent) 16%,transparent),inset 0 1px 0 rgba(255,255,255,.085)}
+.home-card-hitbox.is-pointer-over .home-card,.home-tile-hitbox.is-pointer-over .home-tile{border-color:color-mix(in srgb,var(--home-accent) 44%,rgba(255,255,255,.18));box-shadow:0 26px 78px rgba(0,0,0,.34),0 0 34px color-mix(in srgb,var(--home-accent) 16%,transparent),inset 0 1px 0 rgba(255,255,255,.085)}
 .home-tile{background:linear-gradient(145deg,color-mix(in srgb,var(--home-accent) 12%,rgba(255,255,255,.060)),rgba(255,255,255,.025))}
 .home-sleeve{background:linear-gradient(135deg,color-mix(in srgb,var(--home-accent) 72%,rgba(255,255,255,.10)),color-mix(in srgb,var(--home-accent) 46%,#2442ff) 48%,rgba(248,244,238,.30))}
 .home-disc{background:repeating-radial-gradient(circle,rgba(255,255,255,.10) 0 1px,transparent 1px 10px),conic-gradient(from 210deg,var(--home-accent),color-mix(in srgb,var(--home-accent) 55%,#2442ff),#f8f4ee,color-mix(in srgb,var(--home-accent) 72%,#7ad7c2),var(--home-accent))}
@@ -410,8 +410,8 @@ html.control-glass-svg-ok #empty-home .home-hero.has-custom-bg{
 }
 #empty-home .home-grid .home-card,
 html.control-glass-svg-ok #empty-home .home-grid .home-card,
-#empty-home .home-grid .home-card:hover,
-html.control-glass-svg-ok #empty-home .home-grid .home-card:hover{
+#empty-home .home-grid .home-card-hitbox.is-pointer-over .home-card,
+html.control-glass-svg-ok #empty-home .home-grid .home-card-hitbox.is-pointer-over .home-card{
   background:linear-gradient(145deg,rgba(var(--home-accent-rgb),.14),rgba(14,14,19,.74) 44%,rgba(2,3,5,.72))!important;
   border-color:rgba(255,255,255,.075)!important;
   box-shadow:0 24px 78px rgba(0,0,0,.44),0 0 0 1px rgba(255,255,255,.045),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -18px 42px rgba(0,0,0,.16)!important;

@@ -34,6 +34,8 @@ var stageLyrics = {
 };
 var lyricSunColor = new THREE.Color(0xffe6a4);
 var lyricSunHotColor = new THREE.Color(0xfff4cc);
+var lyricGlowColorScratch = new THREE.Color();
+var lyricSparkColorScratch = new THREE.Color();
 var lyricCameraDir = new THREE.Vector3();
 var lyricCameraRight = new THREE.Vector3();
 var lyricCameraUp = new THREE.Vector3();
@@ -1232,8 +1234,9 @@ function wrapLyricText(ctx, text, maxWidth, maxLines, fontSize) {
   return lines.length ? lines : [''];
 }
 
-function cssColorToThreeColor(css, fallback) {
-  var c = new THREE.Color(fallback || '#d6f8ff');
+function cssColorToThreeColor(css, fallback, target) {
+  var c = target || new THREE.Color();
+  c.set(fallback || '#d6f8ff');
   var value = String(css || fallback || '#d6f8ff').trim();
   try {
     if (/^#[0-9a-f]{3}$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value)) {
@@ -1255,8 +1258,8 @@ function cssColorToThreeColor(css, fallback) {
   }
   return c;
 }
-function lyricThreeColor(css, fallback, minLum) {
-  var c = cssColorToThreeColor(css, fallback || '#d6f8ff');
+function lyricThreeColor(css, fallback, minLum, target) {
+  var c = cssColorToThreeColor(css, fallback || '#d6f8ff', target);
   var lum = c.r * 0.299 + c.g * 0.587 + c.b * 0.114;
   var floor = minLum == null ? 0.34 : minLum;
   if (lum < floor) {
@@ -1986,7 +1989,7 @@ function updateStageLyrics3D(dt) {
       if (data.glowMat) {
         var glowTarget = lyricGlowStrength > 0 ? Math.min(shelfDetailLyricProfile.glowCap, (0.075 + solar * 0.34 + stageLyrics.beatGlow * 0.16 * shelfDetailLyricDim) * Math.min(3.0, glowDrive)) : 0;
         data.glowMat.opacity += (glowTarget - data.glowMat.opacity) * (glowTarget > data.glowMat.opacity ? 0.095 : (shelfDetailOpen ? 0.20 : 0.055));
-        data.glowMat.color.copy(lyricThreeColor(stageLyrics.palette.glowColor || stageLyrics.palette.secondary, '#9cffdf', 0.36)).lerp(lyricSunHotColor, warmth);
+        data.glowMat.color.copy(lyricThreeColor(stageLyrics.palette.glowColor || stageLyrics.palette.secondary, '#9cffdf', 0.36, lyricGlowColorScratch)).lerp(lyricSunHotColor, warmth);
       }
       if (data.sparkMat) {
         var sparkTarget = lyricGlowStrength > 0 && fx.lyricGlowParticles && !shelfDetailOpen ? Math.min(0.42, (0.10 + solar * 0.14 + stageLyrics.beatGlow * 0.10) * Math.min(1.6, glowDrive)) : 0;
@@ -1995,8 +1998,8 @@ function updateStageLyrics3D(dt) {
         setLyricSparkOpacity(data, sparkOpacity);
         var sparkSizeTarget = fx.lyricGlowParticles && !shelfDetailOpen ? (0.050 + solar * 0.016 + stageLyrics.beatGlow * 0.026 + bass * 0.008) : 0.035;
         setLyricSparkSize(data, getLyricSparkSize(data) + (sparkSizeTarget - getLyricSparkSize(data)) * 0.12);
-        var sparkColor = lyricSunHotColor.clone().lerp(lyricSunColor, 0.22 + solar * 0.18);
-        setLyricSparkColor(data, sparkColor);
+        lyricSparkColorScratch.copy(lyricSunHotColor).lerp(lyricSunColor, 0.22 + solar * 0.18);
+        setLyricSparkColor(data, lyricSparkColorScratch);
       }
       var seed = mesh.userData.floatSeed || 0;
       if (data.sunMat) {

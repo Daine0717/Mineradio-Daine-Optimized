@@ -4,9 +4,9 @@
 
 ## 当前版本
 
-当前版本：`2.1.1`
+当前版本：`2.1.2`
 
-状态：Daine 优化版 2.1.1。
+状态：Daine 优化版 2.1.2。
 
 ## 主要功能
 
@@ -26,7 +26,7 @@
 
 Windows 用户请在 [Releases](https://github.com/Daine0717/Mineradio-Daine-Optimized/releases) 下载：
 
-`Mineradio优化版-2.1.1-Setup.exe`
+`Mineradio优化版-2.1.2-Setup.exe`
 
 不要把 `Source code`、`.blockmap` 或 `latest.yml` 当作安装包。
 
