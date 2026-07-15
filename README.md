@@ -26,7 +26,7 @@
 
 Windows 用户请在 [Releases](https://github.com/Daine0717/Mineradio-Daine-Optimized/releases) 下载：
 
-`Mineradio优化版-2.1.2-Setup.exe`
+`mineradio-setup-2.1.2.exe`
 
 不要把 `Source code`、`.blockmap` 或 `latest.yml` 当作安装包。
 

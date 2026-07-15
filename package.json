@@ -60,7 +60,7 @@
       "uninstallerSidebar": "build/installerSidebar.bmp",
       "installerHeader": "build/installerHeader.bmp",
       "include": "build/installer.nsh",
-      "artifactName": "Mineradio优化版-${version}-Setup.${ext}"
+      "artifactName": "mineradio-setup-${version}.${ext}"
     },
     "publish": [
       {

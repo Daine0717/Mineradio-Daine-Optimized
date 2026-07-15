@@ -27,10 +27,10 @@ git diff --check
 
 ## GitHub Release 资产
 
-- `Mineradio优化版-2.1.2-Setup.exe`
-- `Mineradio优化版-2.1.2-Setup.exe.blockmap`
+- `mineradio-setup-2.1.2.exe`
+- `mineradio-setup-2.1.2.exe.blockmap`
 - `latest.yml`
-- `Mineradio优化版-2.1.2-SHA256SUMS.txt`
+- `mineradio-setup-2.1.2-SHA256SUMS.txt`
 - `Mineradio-Daine-Optimized-v2.1.2-source.zip`
 
 源码归档不得包含 `.git`、`node_modules`、`dist`、本地 cookie、更新缓存或其他用户数据。
